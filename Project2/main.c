@@ -31,6 +31,11 @@ volatile unsigned int time_overflow; // number of overflows needed
 volatile int tcnt0_start; // counter start
 volatile int adc_flag; // new adc result flag
 volatile uint16_t adc_reading; // variable to hold adc reading
+volatile uint16_t adc_reading_mv;
+volatile unsigned long clocks;
+volatile unsigned int timer_cont_flag;
+volatile unsigned int adc_cont_flag;
+volatile unsigned int capture_flag;
 
 
 /********************************
@@ -60,6 +65,7 @@ void timer1_init(void)
 		Time_Period = 0;
 		Time_Period_High = 0;						/* Initialise Time_Period_High - not measured yet  */
 		Time_Period_Low = 0;						/* Initialise Time_Period_Low - not measured yet  */
+		capture_flag = 0;
 		
 }
 /********************************
@@ -111,29 +117,113 @@ int main(void)
    PORTD = 0;
    
    Init_USART();
+   timer_init();
+   timer1_init();
+   adc_init();
+   unsigned int val = 0;
    sei(); /*global interrupt enable */
    while (1)         
    {
       if (UCSR0A & (1<<RXC0)) /*check for character received*/
       {
+		  if (capture_flag == 1)
+		  {
+			  capture_flag = 0;
          ch = UDR0;    /*get character sent from PC*/
          switch (ch)
          {
-            case 'a':
-				sprintf(buffer, "That was an a");
-				sendmsg(buffer); /*send first message*/
+            case 'T':
+			case 't':
+				sprintf(buffer, "Period of 555 timer in microseconds: %lu", clocks);
+				sendmsg(buffer);
 				break;
-            case 'b':
-			case 'B':
-				sprintf(buffer, "That was a b or a B");
-				sendmsg(buffer); /*send second message*/
+            case 'L':
+			case 'l':
+				sprintf(buffer, "Low pulse of 555 timer in microseconds: %lu", Time_Period_Low);
+				sendmsg(buffer);
+				break;
+			case 'H':
+			case 'h':
+				sprintf(buffer, "High pulse of 555 timer in microseconds: %lu", Time_Period_High);
+				sendmsg(buffer);
+				break;
+			case 'C':
+			case 'c':
+				//sprintf(buffer, "Continuously report timer input period in microseconds");
+				timer_cont_flag = 1;
+				sprintf(buffer, "val = %i", timer_cont_flag);
+				sendmsg(buffer);
+				break;
+			case 'E':
+			case 'e':
+				sprintf(buffer, "Continuous timer input reporting stopped.");
+				timer_cont_flag = 0;
+				//sprintf(buffer, "val = %i", timer_cont_flag);
+				sendmsg(buffer);
+				break;
+			case 'A':
+			case 'a':
+				sprintf(buffer, "ADC Value: %u", adc_reading);
+				sendmsg(buffer);
+				break;
+			case 'V':
+			case 'v':
+				adc_reading_mv = ((adc_reading*5000)/1024); // mV calculation
+				sprintf(buffer, "ADC Value: %u mV", adc_reading_mv);
+				sendmsg(buffer);
+				break;
+			case 'M':
+			case 'm':
+				sprintf(buffer, "Continuously report ADC0 conversion result in mV");
+				sendmsg(buffer);
+				adc_cont_flag = 1;
+				break;
+			case 'N':
+			case 'n':
+				sprintf(buffer, "Stop continuous reporting of ADC0 input");
+				sendmsg(buffer);
+				adc_cont_flag = 0;
+				break;
+			case 'W':
+			case 'w':
+				sprintf(buffer, "Toggle the LED bit 4 at 125ms");
+				sendmsg(buffer);
+				break;
+			case 'U':
+			case 'u':
+				sprintf(buffer, "Stop toggling LED bit 4");
+				sendmsg(buffer);
+				break;
+			case 'P':
+			case 'p':
+				sprintf(buffer, "Report state of PORTD outputs");
+				sendmsg(buffer);
+				break;
+			case 'S':
+			case 's':
+				sprintf(buffer, "Report current value of OCR2B register");
+				sendmsg(buffer);
 				break;
             default:
-				sprintf(buffer, "That was not an a or a b");
+				sprintf(buffer, "Input not recognized.");
 				sendmsg(buffer); /*send second message*/
 				break;
          } 
       } 
+		 }
+	  if (timer_cont_flag == 1)
+	  {
+		  val = Time_Period_High + Time_Period_Low;
+		  sprintf(buffer, "Value: %u", val);
+		  sendmsg(buffer);
+		  capture_flag = 0;
+	  }
+	  if (adc_cont_flag == 1)
+	  {
+		  adc_reading_mv = ((adc_reading*5000)/1024); // mV calculation
+		  sprintf(buffer, "ADC Value: %u mV", adc_reading_mv);
+		  sendmsg(buffer);
+	  }
    }
    return 1; 
 } 
@@ -160,28 +250,29 @@ ISR(TIMER1_OVF_vect)
 
 ISR(TIMER1_CAPT_vect)
 {
-	unsigned long clocks;
+	
 	
 	end_edge = ICR1;
+	capture_flag = 1;
 	clocks = ((unsigned long)timecount1 * 65536) + (unsigned long)end_edge - (unsigned long)start_edge;
 	Time_Period = (clocks/2);
 	
-	if (TCCR1B &(0<<ICES1) == (0<<ICES1))
+	if (TCCR1B &(1<<ICES1) == (1<<ICES1))
 	{
 		Time_Period_Low = (clocks/2);
 	} else {
 		Time_Period_High = (clocks/2);
 	}
-	TCCR1B = TCCR1B ^ (0<<ICES1);
+	// TCCR1B = TCCR1B ^ (0<<ICES1);
 	
 	start_edge = end_edge;
 	timecount1 = 0;
 	
 	if((Time_Period_High+Time_Period_Low)>HUNDRED_MICROSECONDS)
 	{
-		PORTD = PORTD | (1<<PORTD6);
+		PORTD |= (1<<PORTD6);
 	} else {
-		PORTD = PORTD & ~(1<<PORTD6);
+		PORTD = (0<<PORTD6);
 	}
 }
 
@@ -192,9 +283,9 @@ ISR(ADC_vect)
 	
 	if((adc_reading) > FOUR_VOLTS)
 	{
-		PORTD |= 0b10000000;
+		PORTD |= (1<<PORTD7);
 	} else {
-		PORTD &= ~0b100000000;
+		PORTD = (0<<PORTD7);
 	}
 }
 
