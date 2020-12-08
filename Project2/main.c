@@ -36,7 +36,7 @@ volatile unsigned long clocks;
 volatile unsigned int timer_cont_flag;
 volatile unsigned int adc_cont_flag;
 volatile unsigned int capture_flag;
-
+volatile unsigned int b4_toggle_flag;
 
 /********************************
 * timer initialization function
@@ -46,6 +46,7 @@ void timer_init(void)
 	// timecount0 = 0; // initialize to 0
 	tcnt0_start = 61; // begin timer count at 125
 	time_overflow = 1; // initialize to 0
+	b4_toggle_flag = 0;
 	
 	TCCR0B = (5<<CS00);	// Set T0 Source = Clock (16MHz)/1024 and put Timer in Normal mode
 	
@@ -187,21 +188,23 @@ int main(void)
 			case 'W':
 			case 'w':
 				sprintf(buffer, "Toggle the LED bit 4 at 125ms");
+				b4_toggle_flag = 1;
 				sendmsg(buffer);
 				break;
 			case 'U':
 			case 'u':
 				sprintf(buffer, "Stop toggling LED bit 4");
+				b4_toggle_flag = 0;
 				sendmsg(buffer);
 				break;
 			case 'P':
 			case 'p':
-				sprintf(buffer, "Report state of PORTD outputs");
+				sprintf(buffer, "PORTD Status: %X", PIND);
 				sendmsg(buffer);
 				break;
 			case 'S':
 			case 's':
-				sprintf(buffer, "Report current value of OCR2B register");
+				sprintf(buffer, "OCR2B Status: %d", OCR2B);
 				sendmsg(buffer);
 				break;
             default:
@@ -241,6 +244,15 @@ ISR(TIMER0_OVF_vect)
 {
 	TCNT0 = tcnt0_start;
 	++timecount0;
+	
+	if (b4_toggle_flag == 1)
+	{
+		if (timecount0 >= time_overflow)
+		{
+			PORTD ^= (1<<PORTD4);
+			timecount0 = 0;
+		}
+	}
 }
 
 ISR(TIMER1_OVF_vect)
@@ -263,7 +275,7 @@ ISR(TIMER1_CAPT_vect)
 	} else {
 		Time_Period_High = (clocks/2);
 	}
-	// TCCR1B = TCCR1B ^ (0<<ICES1);
+	TCCR1B = TCCR1B ^ (1<<ICES1);
 	
 	start_edge = end_edge;
 	timecount1 = 0;
