@@ -252,6 +252,8 @@ ISR(TIMER0_OVF_vect)
 			PORTD ^= (1<<PORTD4);
 			timecount0 = 0;
 		}
+	} else {
+		PORTD &= ~(1<<PORTD4);
 	}
 }
 
@@ -284,7 +286,7 @@ ISR(TIMER1_CAPT_vect)
 	{
 		PORTD |= (1<<PORTD6);
 	} else {
-		PORTD = (0<<PORTD6);
+		PORTD &= ~(0<<PORTD6);
 	}
 }
 
@@ -297,7 +299,7 @@ ISR(ADC_vect)
 	{
 		PORTD |= (1<<PORTD7);
 	} else {
-		PORTD = (0<<PORTD7);
+		PORTD &= ~(1<<PORTD7);
 	}
 }
 
