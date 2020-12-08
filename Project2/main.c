@@ -15,7 +15,7 @@
 #define FOUR_VOLTS 818
 #define HUNDRED_MICROSECONDS 100
 
-unsigned char qcntr = 0,sndcntr = 0;   /*indexes into the queue*/
+unsigned char qcntr = 0, sndcntr = 0;   /*indexes into the queue*/
 unsigned char queue[50];       /*character queue*/ 
 
 // global variables
@@ -78,6 +78,7 @@ void timer2_init(void)
 	TCCR2A = ((1<<COM2B1) | (0<<COM2B0) | (0<<WGM21) | (1<<WGM20)); 
 	TIMSK2 = 0; // disable interrupts
 }
+
 /***********************************************
 * ADC initialization function
 ************************************************/
@@ -94,6 +95,9 @@ void adc_init(void)
 	ADCSRB = (4<<ADTS0); // Select AutoTrigger Source to Timer/Counter0 Overflow
 }
 
+/***********************************************
+* USART initialization function
+************************************************/
 void Init_USART(void)
 {
 	UCSR0A	= 0x00;				/* Not necessary  */
@@ -104,9 +108,10 @@ void Init_USART(void)
 	/* NB: the default state of UCSR0C is 0b00000110; which selects 8 bit, no parity, 1 stop bit */
 	/* Don't be tempted to set it to all zeros - you will select 5 bit data word */
 }
-   
-/*this function loads the queue and */
-/*starts the sending process*/
+
+/***********************************************
+* function to load queue and start sending process
+************************************************/
 void sendmsg (char *s)
 {
    qcntr = 0;    /*preset indices*/
@@ -118,6 +123,9 @@ void sendmsg (char *s)
    UDR0 = queue[0];  /*send first character to start process*/
 }
 
+/***********************************************
+* main function
+************************************************/
 int main(void)
 {  
    char ch;  /* character variable for received character*/ 
@@ -133,6 +141,7 @@ int main(void)
    adc_init();
    unsigned int val = 0;
    sei(); /*global interrupt enable */
+   
    while (1)         
    {
       if (UCSR0A & (1<<RXC0)) /*check for character received*/
@@ -302,15 +311,19 @@ int main(void)
    return 1; 
 } 
 
-/*this interrupt occurs whenever the */
-/*USART has completed sending a character*/
+/***********************************************
+* USART character send complete ISR
+************************************************/
 ISR(USART_TX_vect)
 {
    /*send next character and increment index*/
    if (qcntr != sndcntr)  
       UDR0 = queue[sndcntr++]; 
-} 
+}
 
+/***********************************************
+* Timer/Counter0 overflow ISR
+************************************************/
 ISR(TIMER0_OVF_vect)
 {
 	TCNT0 = tcnt0_start;
@@ -328,11 +341,17 @@ ISR(TIMER0_OVF_vect)
 	}
 }
 
+/***********************************************
+* Timer/Counter1 overflow ISR
+************************************************/
 ISR(TIMER1_OVF_vect)
 {
 	++timecount1;
 }
 
+/***********************************************
+* Timer/Counter1 capture ISR
+************************************************/
 ISR(TIMER1_CAPT_vect)
 {
 	
@@ -361,6 +380,9 @@ ISR(TIMER1_CAPT_vect)
 	}
 }
 
+/***********************************************
+* ADC ISR
+************************************************/
 ISR(ADC_vect)
 {
 	adc_reading = ADC;
