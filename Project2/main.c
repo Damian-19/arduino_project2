@@ -64,7 +64,7 @@ void timer1_init(void)
 		start_edge = 0;
 		Time_Period = 0;
 		Time_Period_High = 0;						/* Initialise Time_Period_High - not measured yet  */
-		Time_Period_Low = 0;						/* Initialise Time_Period_Low - not measured yet  */
+		Time_Period_Low = 4;						/* Initialise Time_Period_Low - not measured yet  */
 		capture_flag = 0;
 		
 }
@@ -361,7 +361,7 @@ ISR(TIMER1_CAPT_vect)
 	clocks = ((unsigned long)timecount1 * 65536) + (unsigned long)end_edge - (unsigned long)start_edge;
 	Time_Period = (clocks/2);
 	
-	if (TCCR1B &(1<<ICES1) == (1<<ICES1))
+	if ((TCCR1B & (1<<ICES1)) == (1<<ICES1))
 	{
 		Time_Period_Low = (clocks/2);
 	} else {
