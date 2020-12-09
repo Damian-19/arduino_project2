@@ -12,7 +12,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
-#define FOUR_VOLTS 818
+#define FOUR_VOLTS 818 // define 4V on ADC
 #define HUNDRED_MICROSECONDS 100
 
 unsigned char qcntr = 0, sndcntr = 0;   /*indexes into the queue*/
@@ -21,10 +21,10 @@ unsigned char queue[50];       /*character queue*/
 // global variables
 unsigned long Time_Period, Time_Period_High, Time_Period_Low;
 unsigned int start_edge, end_edge;		// globals for times
-volatile unsigned char timecount1;
-volatile unsigned int timecount0; // number of overflows reached
-volatile unsigned int time_overflow; // number of overflows needed
-volatile int tcnt0_start; // counter start
+volatile unsigned char timecount1; // number of overflows Timer/Counter1
+volatile unsigned int timecount0; // number of overflows Timer/Counter0
+volatile unsigned int time_overflow; // number of overflows needed Timer/Counter0
+volatile int tcnt0_start; // Timer/Counter0 start value
 volatile int adc_flag; // new adc result flag
 volatile uint16_t adc_reading; // variable to hold adc reading
 volatile uint16_t adc_reading_mv; // adc reading converted to mV
@@ -84,9 +84,7 @@ void timer2_init(void)
 ************************************************/
 void adc_init(void)
 {
-	// initialize global variables
-
-	adc_flag = 0; // set if new adc result available
+	adc_flag = 0; // initialize variable to 0
 	
 	// ADC initialization
 	ADMUX = ((1<<REFS0) | (0 << ADLAR) | (0<<MUX0));  // AVCC selected for VREF, ADC0 as ADC input
@@ -98,15 +96,12 @@ void adc_init(void)
 /***********************************************
 * USART initialization function
 ************************************************/
-void Init_USART(void)
+void usart_init(void)
 {
-	UCSR0A	= 0x00;				/* Not necessary  */
+	UCSR0A	= 0x00;
 	
 	UCSR0B	= (1<<RXEN0)|(1<<TXEN0)|(1<<TXCIE0);	  /*enable receiver, transmitter and transmit interrupt, 0x58;*/
 	UBRR0	= 103;  /*baud rate = 9600, USART 2X = 0 so UBRR0 = ((16*10^6)/(16*9600))-1 = 103.167, rounded to 103 */
-	
-	/* NB: the default state of UCSR0C is 0b00000110; which selects 8 bit, no parity, 1 stop bit */
-	/* Don't be tempted to set it to all zeros - you will select 5 bit data word */
 }
 
 /***********************************************
@@ -118,8 +113,10 @@ void sendmsg (char *s)
    sndcntr = 1;  /*set to one because first character already sent*/
    queue[qcntr++] = 0x0d;   /*put CRLF into the queue first*/
    queue[qcntr++] = 0x0a;
+   
    while (*s) 
       queue[qcntr++] = *s++;   /*put characters into queue*/
+	  
    UDR0 = queue[0];  /*send first character to start process*/
 }
 
@@ -134,7 +131,8 @@ int main(void)
    DDRD = 0b11011000; // set PORTD bits 7,6,4,3 to outputs
    //PORTD = 0;
    
-   Init_USART();
+   // call initialisation functions
+   usart_init();
    timer_init();
    timer1_init();
    timer2_init();
@@ -152,7 +150,8 @@ int main(void)
 			 ch = UDR0;    /*get character sent from PC*/
 			 switch (ch)
 			 { 
-				// case 0-9 controls LED bit 3 PWM - WORKING
+				// case 0-9 controls LED bit 3 PWM
+				// PWM START
 				case '0':
 					sprintf(buffer, "LED bit 3 set to OFF");
 					sendmsg(buffer);
@@ -203,7 +202,8 @@ int main(void)
 					sendmsg(buffer);
 					OCR2B = 230; // 90% of 256 approx.
 					break;
-				case 'T': // Period 555 Timer - WORKING
+				// PWM END
+				case 'T': // Period 555 Timer
 				case 't':
 					sprintf(buffer, "Period of 555 timer in microseconds: %lu", clocks);
 					sendmsg(buffer);
@@ -213,66 +213,66 @@ int main(void)
 					sprintf(buffer, "Low pulse of 555 timer in microseconds: %lu", Time_Period_Low);
 					sendmsg(buffer);
 					break;
-				case 'H': // High Pulse 555 Timer - WORKING
+				case 'H': // High Pulse 555 Timer
 				case 'h':
 					sprintf(buffer, "High pulse of 555 timer in microseconds: %lu", Time_Period_High);
 					sendmsg(buffer);
 					break;
-				case 'C': // Continuous Timer Reporting - WORKING
+				case 'C': // Continuous Timer Reporting
 				case 'c':
 					sprintf(buffer, "Continuously reporting timer input period in microseconds");
 					sendmsg(buffer);
-					timer_cont_flag = 1;
+					timer_cont_flag = 1; // set timer continuous reporting
 					//sprintf(buffer, "val = %i", timer_cont_flag);
 					break;
-				case 'E': // Stop Continuous Timer Reporting - WORKING
+				case 'E': // Stop Continuous Timer Reporting
 				case 'e':
 					sprintf(buffer, "Continuous timer input reporting stopped.");
 					sendmsg(buffer);
-					timer_cont_flag = 0;
+					timer_cont_flag = 0; // stop timer continuous reporting
 					//sprintf(buffer, "val = %i", timer_cont_flag);
 					break;
-				case 'A': // ADC0 - WORKING
+				case 'A': // ADC0
 				case 'a':
 					sprintf(buffer, "ADC Value: %u", adc_reading);
 					sendmsg(buffer);
 					break;
-				case 'V': // ADC0 in mV - WORKING
+				case 'V': // ADC0 in mV
 				case 'v':
 					adc_reading_mv = ((adc_reading*5000)/1024); // mV calculation
 					sprintf(buffer, "ADC Value: %u mV", adc_reading_mv);
 					sendmsg(buffer);
 					break;
-				case 'M': // ADC0 Continuous Reporting - WORKING
+				case 'M': // ADC0 Continuous Reporting
 				case 'm':
 					sprintf(buffer, "Continuously reporting ADC0 conversion result in mV");
 					sendmsg(buffer);
-					adc_cont_flag = 1;
+					adc_cont_flag = 1; // set ADC0 continuous reporting
 					break;
-				case 'N': // Stop ADC0 Continuous Reporting - WORKING
+				case 'N': // Stop ADC0 Continuous Reporting
 				case 'n':
 					sprintf(buffer, "Stop continuous reporting of ADC0 input");
 					sendmsg(buffer);
-					adc_cont_flag = 0;
+					adc_cont_flag = 0; // stop ADC0 continuous reporting
 					break;
-				case 'W': // Toggle PORTD4 - WORKING
+				case 'W': // Toggle PORTD4
 				case 'w':
 					sprintf(buffer, "Toggle the LED bit 4 at 125ms");
-					b4_toggle_flag = 1;
+					b4_toggle_flag = 1; // enable PORTD4 toggling
 					sendmsg(buffer);
 					break;
-				case 'U': //  Stop Toggle PORTD4 - WORKING
+				case 'U': //  Stop Toggle PORTD4
 				case 'u':
 					sprintf(buffer, "Stop toggling LED bit 4");
-					b4_toggle_flag = 0;
+					b4_toggle_flag = 0; // disable PORTD4 toggling
 					sendmsg(buffer);
 					break;
-				case 'P': // PORTD Status -  WORKING 
+				case 'P': // PORTD Status
 				case 'p':
 					sprintf(buffer, "PORTD Status: %X", PIND);
 					sendmsg(buffer);
 					break;
-				case 'S': // OCR2B Status - WORKING
+				case 'S': // OCR2B Status
 				case 's':
 					sprintf(buffer, "OCR2B Status: %d", OCR2B);
 					sendmsg(buffer);
