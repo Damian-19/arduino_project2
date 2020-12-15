@@ -205,22 +205,22 @@ int main(void)
 				// PWM END
 				case 'T': // Period 555 Timer
 				case 't':
-					sprintf(buffer, "Period of 555 timer in microseconds: %lu", clocks);
+					sprintf(buffer, "Period of 555 timer: %lu us", clocks);
 					sendmsg(buffer);
 					break;
 				case 'L': // Low Pulse 555 Timer - CHECK
 				case 'l':
-					sprintf(buffer, "Low pulse of 555 timer in microseconds: %lu", Time_Period_Low);
+					sprintf(buffer, "Low pulse of 555 timer: %lu us", Time_Period_Low);
 					sendmsg(buffer);
 					break;
 				case 'H': // High Pulse 555 Timer
 				case 'h':
-					sprintf(buffer, "High pulse of 555 timer in microseconds: %lu", Time_Period_High);
+					sprintf(buffer, "High pulse of 555 timer: %lu us", Time_Period_High);
 					sendmsg(buffer);
 					break;
 				case 'C': // Continuous Timer Reporting
 				case 'c':
-					sprintf(buffer, "Continuously reporting timer input period in microseconds");
+					sprintf(buffer, "Continuously reporting timer input period.");
 					sendmsg(buffer);
 					timer_cont_flag = 1; // set timer continuous reporting
 					//sprintf(buffer, "val = %i", timer_cont_flag);
@@ -239,13 +239,15 @@ int main(void)
 					break;
 				case 'V': // ADC0 in mV
 				case 'v':
-					adc_reading_mv = ((adc_reading*5000)/1024); // mV calculation
+					adc_reading_mv = ((adc_reading*5000)/1023); // mV calculation
+					/****** The value in mV is calculated correctly in the line above, but for some reason *****/
+					/****** we couldn't get the correct value to display in the sprintf statement below *****/
 					sprintf(buffer, "ADC Value: %u mV", adc_reading_mv);
 					sendmsg(buffer);
 					break;
 				case 'M': // ADC0 Continuous Reporting
 				case 'm':
-					sprintf(buffer, "Continuously reporting ADC0 conversion result in mV");
+					sprintf(buffer, "Continuously reporting ADC0 conversion result");
 					sendmsg(buffer);
 					adc_cont_flag = 1; // set ADC0 continuous reporting
 					break;
@@ -269,7 +271,7 @@ int main(void)
 					break;
 				case 'P': // PORTD Status
 				case 'p':
-					sprintf(buffer, "PORTD Status: %X", PIND);
+					sprintf(buffer, "PORTD Status: 0x%X", PIND);
 					sendmsg(buffer);
 					break;
 				case 'S': // OCR2B Status
@@ -289,7 +291,7 @@ int main(void)
 		  if (qcntr == sndcntr) // check data can be sent
 		  {
 		  val = Time_Period_High + Time_Period_Low;
-		  sprintf(buffer, "Value: %u", val);
+		  sprintf(buffer, "Value: %u us", val);
 		  sendmsg(buffer);
 		  capture_flag = 0; // reset flag
 		  }
@@ -300,7 +302,8 @@ int main(void)
 		  {
 			  if (qcntr == sndcntr) // check data can be sent
 			  {
-			  adc_reading_mv = ((adc_reading*5000)/1024); // mV calculation
+			  adc_reading_mv = ((adc_reading*5000)/1023); // mV calculation
+			  // The same issue with the incorrect values displaying happens here
 			  sprintf(buffer, "ADC Value: %u mV", adc_reading_mv);
 			  sendmsg(buffer);
 			  adc_flag = 0; // reset flag
